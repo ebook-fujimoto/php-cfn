@@ -1,0 +1,42 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM User Stack
+
+Parameters:
+  GithubSnsHookLambdaArn:
+    Type: String
+  CloudFormationSnsHookLambdaArn:
+    Type: String
+
+Resources:
+  # SNS
+  ## Github -> Lambda SNS
+  GithubToLambdaSnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: GithubToLambdaSnsTopic
+  GithubToLambdaSnsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: lambda
+      Endpoint: !Ref GithubSnsHookLambdaArn
+      TopicArn: !Ref GithubToLambdaSnsTopic
+
+  ## CloudFormation -> Lambda SNS
+  CloudFormationToLambdaSnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: CloudFormationToLambdaSnsTopic
+  CloudFormationToLambdaSnsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: lambda
+      Endpoint: !Ref CloudFormationSnsHookLambdaArn
+      TopicArn: !Ref CloudFormationToLambdaSnsTopic
+
+Outputs:
+  GithubToLambdaSnsTopicArn:
+    Description: Sns topic for Github SNS
+    Value: !Ref GithubToLambdaSnsTopic
+  CloudFormationToLambdaSnsTopicArn:
+    Value: !Ref CloudFormationToLambdaSnsTopic

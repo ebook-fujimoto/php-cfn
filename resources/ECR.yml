@@ -1,0 +1,27 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM User Stack
+
+Resources:
+  ## Common 用 成果物レポジトリ
+  EcrRepoCommon:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: common
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: Common statement
+            Effect: Allow
+            Principal:
+              AWS:
+                - arn:aws:iam::157144849617:root
+            Action:
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - ecr:BatchCheckLayerAvailability
+
+Outputs:
+  EcrRepoCommonName:
+    Value: !Ref EcrRepoCommon

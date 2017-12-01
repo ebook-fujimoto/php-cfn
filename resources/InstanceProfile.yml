@@ -1,0 +1,18 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Instance Profile Stack
+
+Parameters:
+  EC2S3ReadRoleName:
+    Type: String
+
+Resources:
+  # Instance Profile
+  ## Web Server 用 Instance Profile
+  WebServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      InstanceProfileName: WebServerInstanceProfile
+      Roles:
+        - !Ref EC2S3ReadRoleName

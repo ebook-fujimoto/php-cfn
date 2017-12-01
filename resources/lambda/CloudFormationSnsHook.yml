@@ -1,0 +1,42 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodeBuild Start Lambda Stack
+
+Parameters:
+  BasicLambdaRoleArn:
+    Type: String
+
+Resources:
+  ## Github SNS hook lambda
+  CloudFormationSnsHookLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CloudFormationSnsHookLambda
+      Handler: index.handler
+      MemorySize: 128
+      Runtime: nodejs6.10
+      Timeout: 10
+      Role: !Ref BasicLambdaRoleArn
+      Code:
+        ZipFile: |
+          'use strict';
+
+          //------------------------------------//
+          const AWS = require('aws-sdk');
+
+          exports.handler = (event, context, callback) => {
+            event.Records[0].Sns.Message  // StackId=''\n
+            console.log(JSON.stringify(event));
+          };
+
+  CloudFormationSnsHookLambdaSourcePolicy:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CloudFormationSnsHookLambda.Arn
+      Action: lambda:invokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:CloudFormationToLambdaSnsTopic
+
+Outputs:
+  CloudFormationSnsHookLambdaArn:
+    Value: !GetAtt CloudFormationSnsHookLambda.Arn

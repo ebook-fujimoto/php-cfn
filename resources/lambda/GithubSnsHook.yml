@@ -1,0 +1,94 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodeBuild Start Lambda Stack
+
+Parameters:
+  InvokeFunctionLambdaRoleArn:
+    Type: String
+
+Resources:
+  ## Github SNS hook lambda
+  GithubSnsHookLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GithubSnsHookLambda
+      Handler: index.handler
+      MemorySize: 128
+      Runtime: nodejs6.10
+      Timeout: 10
+      Role: !Ref InvokeFunctionLambdaRoleArn
+      Code:
+        ZipFile: |
+          'use strict';
+
+          //------------------------------------//
+
+          const AWS = require('aws-sdk');
+          const lambda = new AWS.Lambda();
+
+          exports.handler = (event, context, callback) => {
+            const message = JSON.parse(event.Records[0].Sns.Message);
+            if (!message.pull_request) {
+              console.log("This is not pull request");
+              return callback(null, "not pull request");
+            }
+            if (message.action !== 'opened'
+                && message.action !== 'reopened'
+                && message.action !== 'synchronize') {
+              console.log("This is not open or update pull request");
+              return callback(null, "not pull request open or update");
+            }
+
+            // Launch CodeBuild Lambda
+            const buildStart = new Promise((resolve, reject) => {
+              lambda.invokeAsync({
+                FunctionName: 'CodeBuildLambda',
+                InvokeArgs: JSON.stringify({
+                  projectName: message.repository.name,
+                  sha: message.pull_request.head.sha
+                })
+              }, (err, data) => {
+                if (err) {
+                  return reject(err);
+                }
+                resolve(data);
+              });
+            });
+
+            const updateStatus = new Promise((resolve, reject) => {
+              lambda.invokeAsync({
+                FunctionName: 'GithubSendStatusLambda',
+                InvokeArgs: JSON.stringify({
+                  repository: message.repository.full_name,
+                  sha: message.pull_request.head.sha,
+                  state: 'pending'
+                })
+              }, (err, data) => {
+                if (err) {
+                  return reject(err);
+                }
+                resolve(data);
+              });
+            });
+
+            Promise.all([updateStatus, buildStart])
+              .then((data) => {
+                return callback(null, "build start");
+              })
+              .catch((err) => {
+                console.error(err);
+                return callback(err, null);
+              });
+          };
+
+  GithubSnsHookLambdaSourcePolicy:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt GithubSnsHookLambda.Arn
+      Action: lambda:invokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:GithubToLambdaSnsTopic
+
+Outputs:
+  GithubSnsHookLambdaArn:
+    Value: !GetAtt GithubSnsHookLambda.Arn

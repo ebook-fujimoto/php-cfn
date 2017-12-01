@@ -1,0 +1,34 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodeBuild Start Lambda Stack
+
+Parameters:
+  CodeBuildLambdaRoleArn:
+    Type: String
+
+Resources:
+  ## CodeBuild start lambda
+  CodeBuildLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CodeBuildLambda
+      Handler: index.handler
+      MemorySize: 128
+      Runtime: nodejs6.10
+      Timeout: 10
+      Role: !Ref CodeBuildLambdaRoleArn
+      Code:
+        ZipFile: |
+          'use strict';
+
+          const AWS = require('aws-sdk');
+          const codebuild = new AWS.CodeBuild();
+
+          exports.handler = (event, context, callback) => {
+              codebuild.startBuild({
+                  projectName: event.projectName,
+                  sourceVersion: event.sha
+              }, (err, data) => {
+                  return callback(err, data);
+              });
+          };

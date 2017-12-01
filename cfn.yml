@@ -1,0 +1,135 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create php DevOps env.
+
+Parameters:
+  ## 設定ファイル等を格納している S3 バケットの名前
+  SettingsS3BucketName:
+    Type: String
+    Default: opst-ezaki-cloudformation-php
+
+  ## Github へ status を送るユーザー
+  GithubAccessUserName:
+    Type: String
+    Default: github username here
+
+  ## Github へ status を送るユーザーのトークン
+  GithubAccessToken:
+    Type: String
+    Default: github access token here
+    NoEcho: true
+
+  ## レポジトリを所有しているユーザーまたはチームの名前
+  GithubUserName:
+    Type: String
+    Default: opst-ezaki
+
+  ## Common にあたるレポジトリの名前
+  GithubCommonRepoName:
+    Type: String
+    Default: php-a
+
+  ## Member にあたるレポジトリの名前
+  GithubMemberRepoName:
+    Type: String
+    Default: php-b
+
+
+Resources:
+  IAMUser:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/IAMUser.yml
+      Parameters:
+        GithubToLambdaSnsTopicArn: !GetAtt SNS.Outputs.GithubToLambdaSnsTopicArn
+
+  IAMRole:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/IAMRole.yml
+
+  SecurityGroup:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/SecurityGroup.yml
+
+  InstanceProfile:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/InstanceProfile.yml
+      Parameters:
+        EC2S3ReadRoleName: !GetAtt IAMRole.Outputs.EC2S3ReadRoleName
+
+  Lambda:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/Lambda.yml
+      Parameters:
+        BasicLambdaRoleArn: !GetAtt IAMRole.Outputs.BasicLambdaRoleArn
+        InvokeFunctionLambdaRoleArn: !GetAtt IAMRole.Outputs.InvokeFunctionLambdaRoleArn
+        CodeBuildLambdaRoleArn: !GetAtt IAMRole.Outputs.CodeBuildLambdaRoleArn
+        CloudFormationDeployLambdaRoleArn: !GetAtt IAMRole.Outputs.CloudFormationDeployLambdaRoleArn
+        ArtifactBucketMemberName: !GetAtt S3.Outputs.ArtifactBucketMemberName
+        SettingsS3BucketName: !Ref SettingsS3BucketName
+        GithubUserName: !Ref GithubUserName
+        GithubCommonRepoName: !Ref GithubCommonRepoName
+        GithubAccessUserName: !Ref GithubAccessUserName
+        GithubAccessToken: !Ref GithubAccessToken
+
+  SNS:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/SNS.yml
+      Parameters:
+        GithubSnsHookLambdaArn: !GetAtt Lambda.Outputs.GithubSnsHookLambdaArn
+        CloudFormationSnsHookLambdaArn: !GetAtt Lambda.Outputs.CloudFormationSnsHookLambdaArn
+
+  S3:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/S3.yml
+      Parameters:
+        GithubUserName: !Ref GithubUserName
+        GithubMemberRepoName: !Ref GithubMemberRepoName
+
+  ECR:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/ECR.yml
+
+  CodeBuild:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/CodeBuild.yml
+      Parameters:
+        GithubUserName: !Ref GithubUserName
+        GithubCommonRepoName: !Ref GithubCommonRepoName
+        EcrRepoCommonName: !GetAtt ECR.Outputs.EcrRepoCommonName
+        GithubMemberRepoName: !Ref GithubMemberRepoName
+        CodebuildRoleArn: !GetAtt IAMRole.Outputs.CodebuildRoleArn
+        ArtifactBucketMemberName: !GetAtt S3.Outputs.ArtifactBucketMemberName
+
+  CloudWatch:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: resources/CloudWatch.yml
+      Parameters:
+        CodeBuildStatusEventLambdaArn: !GetAtt Lambda.Outputs.CodeBuildStatusEventLambdaArn
+
+
+Outputs:
+  GithubSnsRegion:
+    Description: Sns region for Github SNS
+    Value: !Ref AWS::Region
+
+  GithubSnsTopic:
+    Description: Sns topic for Github SNS
+    Value: !GetAtt SNS.Outputs.GithubToLambdaSnsTopicArn
+
+  GithubSnsKey:
+    Description: Aws key for Github SNS
+    Value: !GetAtt IAMUser.Outputs.GithubSnsKey
+
+  GithubSnsSecret:
+    Description: Aws secret for Github SNS
+    Value: !GetAtt IAMUser.Outputs.GithubSnsSecret

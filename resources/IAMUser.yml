@@ -1,0 +1,40 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM User Stack
+
+Parameters:
+  GithubToLambdaSnsTopicArn:
+    Type: String
+
+Resources:
+  # User
+  ## Github SNS ユーザー
+  GithubSnsUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub GithubSnsUser-${AWS::Region}
+      Policies:
+        -
+          PolicyName: GITHUB-SNS-USER-POLICY
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: Allow
+                Resource:
+                  - !Ref GithubToLambdaSnsTopicArn
+                Action:
+                  - sns:Publish
+  GithubSnsUserKey:
+    Type: "AWS::IAM::AccessKey"
+    Properties:
+      UserName: !Ref GithubSnsUser
+
+Outputs:
+  GithubSnsKey:
+    Description: Aws key for Github SNS
+    Value: !Ref GithubSnsUserKey
+
+  GithubSnsSecret:
+    Description: Aws secret for Github SNS
+    Value: !GetAtt GithubSnsUserKey.SecretAccessKey

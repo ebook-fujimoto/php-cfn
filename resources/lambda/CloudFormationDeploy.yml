@@ -1,0 +1,72 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodeBuild Start Lambda Stack
+
+Parameters:
+  CloudFormationDeployLambdaRoleArn:
+    Type: String
+  ArtifactBucketMemberName:
+    Type: String
+  GithubUserName:
+    Type: String
+  GithubCommonRepoName:
+    Type: String
+  SettingsS3BucketName:
+    Type: String
+
+Resources:
+  ## CodeBuild status change hook lambda
+  CloudFormationDeployLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CloudFormationDeployLambda
+      Handler: index.handler
+      MemorySize: 128
+      Runtime: nodejs6.10
+      Timeout: 10
+      Role: !Ref CloudFormationDeployLambdaRoleArn
+      Environment:
+        Variables:
+          ARTIFACT_BUCKET_NAME: !Ref ArtifactBucketMemberName
+          SETTINGS_S3_BUCKET_NAME: !Ref SettingsS3BucketName
+          GITHUB_USER_NAME: !Ref GithubUserName
+          GITHUB_COMMON_REPO_NAME: !Ref GithubCommonRepoName
+      Code:
+        ZipFile: |
+          'use strict';
+
+          //------------------------------------//
+
+          const AWS = require('aws-sdk');
+          const cloudformation = new AWS.CloudFormation();
+
+          exports.handler = (event, context, callback) => {
+            if (event.status !== 'SUCCEEDED') {
+              return callback(null, "not succeeded build");
+            }
+
+            if (event.repository === `${process.env.GITHUB_USER_NAME}/${process.env.GITHUB_COMMON_REPO_NAME}`) {
+              return callback(null, `this repository is ${event.repository}`);
+            }
+
+            cloudformation.createStack({
+              StackName: `${event.repository.split('/')[1]}-${event.sha}`,
+              TemplateURL: `https://s3-${process.env.AWS_REGION}.amazonaws.com/${process.env.SETTINGS_S3_BUCKET_NAME}/teststack.yml`,
+              Parameters: [
+                {
+                  ParameterKey: 'ShaID',
+                  ParameterValue: event.sha
+                },
+                {
+                  ParameterKey: 'BucketName',
+                  ParameterValue: process.env.ARTIFACT_BUCKET_NAME
+                }
+              ]
+            }, (err, data) => {
+              if (err) {
+                console.error(err);
+                return callback(err, null);
+              }
+              return callback(null, data);
+            });
+          };

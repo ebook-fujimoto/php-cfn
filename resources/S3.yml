@@ -1,0 +1,22 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM User Stack
+
+Parameters:
+  GithubUserName:
+    Type: String
+  GithubMemberRepoName:
+    Type: String
+
+Resources:
+  ## Member 成果物用バケット
+  ArtifactBucketMember:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${GithubUserName}-${GithubMemberRepoName}
+      VersioningConfiguration:
+        Status: Enabled
+
+Outputs:
+  ArtifactBucketMemberName:
+    Value: !Ref ArtifactBucketMember

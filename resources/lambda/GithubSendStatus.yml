@@ -1,0 +1,79 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodeBuild Start Lambda Stack
+
+Parameters:
+  BasicLambdaRoleArn:
+    Type: String
+  GithubAccessUserName:
+    Type: String
+  GithubAccessToken:
+    Type: String
+
+Resources:
+  ## Send status to Github lambda
+  GithubSendStatusLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GithubSendStatusLambda
+      Handler: index.handler
+      MemorySize: 128
+      Runtime: nodejs6.10
+      Timeout: 10
+      Role: !Ref BasicLambdaRoleArn
+      Environment:
+        Variables:
+          ACCESS_USER: !Ref GithubAccessUserName
+          ACCESS_TOKEN: !Ref GithubAccessToken
+      Code:
+        ZipFile: |
+          'use strict';
+
+          // Github User name
+          const accessUser = process.env.ACCESS_USER;
+          // Github User アクセストークン
+          const accessToken = process.env.ACCESS_TOKEN;
+
+          //------------------------------------//
+
+          const auth = `${accessUser}:${accessToken}`;
+          const hostname = 'api.github.com';
+          const userAgent = 'nodejs';
+          const https = require('https');
+
+          exports.handler = (event, context, callback) => {
+            const postBody = JSON.stringify({
+              state: event.state,
+              target_url: event.url,
+              description: "test",
+              context: "AWS CodeBuild test"
+            });
+
+            const req = https.request({
+              method: "POST",
+              hostname: hostname,
+              path: `/repos/${event.repository}/statuses/${event.sha}`,
+              auth: auth,
+              headers: {
+                'User-Agent': userAgent,
+                'Content-Type': 'application/json',
+                'Content-Length': postBody.length
+              }
+            }, (res) => {
+              let body = '';
+              res.on('data', (c) => {
+                body += c;
+              });
+              res.on('end', () => {
+                return callback(null, `set status`);
+              });
+              res.on('error', (e) => {
+                return callback(e, null);
+              });
+            });
+            req.write(postBody);
+            req.on('error', (e) => {
+              return callback(e, null);
+            });
+            req.end();
+          };

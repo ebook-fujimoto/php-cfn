@@ -1,0 +1,52 @@
+Parameters:
+  ShaID:
+    Type: String
+  BucketName:
+    Type: String
+
+Resources:
+  TestEC2:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          InstallAndRun:
+            - Install
+        Install:
+          packages:
+            rpm:
+              remi: http://rpms.famillecollet.com/enterprise/remi-release-6.rpm
+            yum:
+              php71: []
+          commands:
+            default:
+              command: |
+                aws s3 cp s3://${BucketName}/out/archive-${ShaID}.zip ~/archive.zip \
+                && sudo unzip -o ~/archive.zip -d /var/www/html/ \
+                && rm -rf ~/archive.zip \
+                && sudo service httpd start
+              env:
+                ShaID: !Ref ShaID
+                BucketName: !Ref BucketName
+    Properties:
+      AvailabilityZone: ap-northeast-1c
+      DisableApiTermination: false
+      EbsOptimized: false
+      ImageId: ami-2803ac4e
+      InstanceInitiatedShutdownBehavior: terminate
+      InstanceType: t2.micro
+      SecurityGroups:
+        - WebServerSecurityGroup
+      Monitoring: false
+      IamInstanceProfile: WebServerInstanceProfile
+      UserData:
+        "Fn::Base64":
+          !Sub |
+            #!/bin/bash -xe
+            yum install -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource TestEC2 --configsets InstallAndRun --region ${AWS::Region} 1> /home/ec2-user/out.txt 2> /home/ec2-user/err.txt
+
+
+Outputs:
+  EC2Uri:
+    Value: !GetAtt TestEC2.PublicDnsName

@@ -1,0 +1,164 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM Role Stack
+
+Resources:
+  ## 標準 lambda ロール
+  BasicLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub BasicLambdaRole-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  ## lambda 実行 lambda ロール
+  InvokeFunctionLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub InvokeFunctionLambdaRole-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+
+  ## CodeBuild hook lambda 用 ロール
+  CodeBuildLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub CodeBuildLambdaRole-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
+
+  ## CloudFormation hook lambda 用 ロール( CFn 実行に Administrator 権限が必要)
+  CloudFormationDeployLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub CloudFormationDeployLambdaRole-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  ## Codebuild 用権限ロール
+  CodebuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub CodebuildRole-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        -
+          PolicyName: CODEBUILD-POLICY
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: Allow
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+              -
+                Effect: Allow
+                Resource:
+                  - !Sub arn:aws:ssm::${AWS::Region}:${AWS::AccountId}:parameter/CodeBuild/*
+                Action:
+                  - ssm:GetParameters
+              -
+                Effect: Allow
+                Resource: "*"
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetAuthorizationToken
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+              -
+                Effect: Allow
+                Resource:
+                  - arn:aws:s3:::*
+                Action:
+                  - s3:PutObject
+
+  ## EC2 用 S3 オブジェクト取得ロール
+  EC2S3ReadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub EC2S3ReadRole-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+Outputs:
+  BasicLambdaRoleArn:
+    Value: !GetAtt BasicLambdaRole.Arn
+  InvokeFunctionLambdaRoleArn:
+    Value: !GetAtt InvokeFunctionLambdaRole.Arn
+  CloudFormationDeployLambdaRoleArn:
+    Value: !GetAtt CloudFormationDeployLambdaRole.Arn
+  EC2S3ReadRoleArn:
+    Value: !GetAtt EC2S3ReadRole.Arn
+  EC2S3ReadRoleName:
+    Value: !Ref EC2S3ReadRole
+  CodebuildRoleArn:
+    Value: !GetAtt CodebuildRole.Arn
+  CodeBuildLambdaRoleArn:
+    Value: !GetAtt CodeBuildLambdaRole.Arn

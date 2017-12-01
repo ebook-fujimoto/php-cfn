@@ -1,0 +1,61 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM User Stack
+
+Parameters:
+  GithubUserName:
+    Type: String
+  GithubCommonRepoName:
+    Type: String
+  EcrRepoCommonName:
+    Type: String
+  GithubMemberRepoName:
+    Type: String
+  ArtifactBucketMemberName:
+    Type: String
+  CodebuildRoleArn:
+    Type: String
+
+Resources:
+  # CodeBuild
+  ## Common CodeBuild
+  CodebuildCommon:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref GithubCommonRepoName
+      Artifacts:
+        Type: NO_ARTIFACTS
+      ServiceRole: !Ref CodebuildRoleArn
+      Source:
+        BuildSpec: buildspec.yml
+        Type: GITHUB
+        Location: !Sub https://github.com/${GithubUserName}/${GithubCommonRepoName}
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          -
+            Name: REPO_URI
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrRepoCommonName}
+        Image: aws/codebuild/docker:1.12.1
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+
+  ## Member CodeBuild
+  CodebuildMember:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref GithubMemberRepoName
+      Artifacts:
+        Type: S3
+        Location: !Ref ArtifactBucketMemberName
+        Name: out
+      ServiceRole: !Ref CodebuildRoleArn
+      Source:
+        BuildSpec: buildspec.yml
+        Type: GITHUB
+        Location: !Sub https://github.com/${GithubUserName}/${GithubMemberRepoName}
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/common:latest
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER

@@ -1,0 +1,72 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CodeBuild Start Lambda Stack
+
+Parameters:
+  InvokeFunctionLambdaRoleArn:
+    Type: String
+
+Resources:
+  ## CodeBuild status change hook lambda
+  CodeBuildStatusEventLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CodeBuildStatusEventLambda
+      Handler: index.handler
+      MemorySize: 128
+      Runtime: nodejs6.10
+      Timeout: 10
+      Role: !Ref InvokeFunctionLambdaRoleArn
+      Code:
+        ZipFile: |
+          'use strict';
+
+          //------------------------------------//
+          const AWS = require('aws-sdk');
+          const lambda = new AWS.Lambda();
+
+          const statusDictionary = {
+            'IN_PROGRESS': 'pending',
+            'SUCCEEDED': 'success',
+            'FAILED': 'failure',
+            'STOPPED': 'failure'
+          };
+
+          exports.handler = (event, context, callback) => {
+            // Launch CodeBuild Lambda
+            lambda.invokeAsync({
+              FunctionName: 'GithubSendStatusLambda',
+              InvokeArgs: JSON.stringify({
+                url: `https://${event.region}.console.aws.amazon.com/codebuild/home?region=${event.region}#/builds/${event.detail['project-name']}:${event.detail['build-id'].match(/:([^:]+)$/)[1]}/view/new`,
+                repository: event.detail['additional-information'].source.location.replace('https://github.com/', ''),
+                sha: event.detail['additional-information']['source-version'],
+                state: statusDictionary[event.detail['build-status']]
+              })
+            }, (err, data) => {
+              callback(err, data);
+            });
+
+            // Launch Deploy Lambda
+            lambda.invokeAsync({
+              FunctionName: 'CloudFormationDeployLambda',
+              InvokeArgs: JSON.stringify({
+                status: event.detail['build-status'],
+                repository: event.detail['additional-information'].source.location.replace('https://github.com/', ''),
+                sha: event.detail['additional-information']['source-version'],
+              })
+            }, (err, data) => {
+              callback(err, data);
+            });
+          };
+
+  CodeBuildStatusEventLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CodeBuildStatusEventLambda.Arn
+      Action: lambda:invokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/CodeBuildStatusCloudWatchEvent
+
+Outputs:
+  CodeBuildStatusEventLambdaArn:
+    Value: !GetAtt CodeBuildStatusEventLambda.Arn

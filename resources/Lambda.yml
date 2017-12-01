@@ -1,0 +1,82 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Lambda Stack
+
+Parameters:
+  BasicLambdaRoleArn:
+    Type: String
+  InvokeFunctionLambdaRoleArn:
+    Type: String
+  CloudFormationDeployLambdaRoleArn:
+    Type: String
+  CodeBuildLambdaRoleArn:
+    Type: String
+  ArtifactBucketMemberName:
+    Type: String
+  SettingsS3BucketName:
+    Type: String
+  GithubUserName:
+    Type: String
+  GithubCommonRepoName:
+    Type: String
+  GithubAccessUserName:
+    Type: String
+  GithubAccessToken:
+    Type: String
+
+Resources:
+  CodeBuild:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: lambda/CodeBuild.yml
+      Parameters:
+        CodeBuildLambdaRoleArn: !Ref CodeBuildLambdaRoleArn
+
+  GithubSendStatus:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: lambda/GithubSendStatus.yml
+      Parameters:
+        BasicLambdaRoleArn: !Ref BasicLambdaRoleArn
+        GithubAccessUserName: !Ref GithubAccessUserName
+        GithubAccessToken: !Ref GithubAccessToken
+
+  GithubSnsHook:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: lambda/GithubSnsHook.yml
+      Parameters:
+        InvokeFunctionLambdaRoleArn: !Ref InvokeFunctionLambdaRoleArn
+
+  CodeBuildStatusEvent:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: lambda/CodeBuildStatusEvent.yml
+      Parameters:
+        InvokeFunctionLambdaRoleArn: !Ref InvokeFunctionLambdaRoleArn
+
+  CloudFormationDeploy:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: lambda/CloudFormationDeploy.yml
+      Parameters:
+        CloudFormationDeployLambdaRoleArn: !Ref CloudFormationDeployLambdaRoleArn
+        ArtifactBucketMemberName: !Ref ArtifactBucketMemberName
+        SettingsS3BucketName: !Ref SettingsS3BucketName
+        GithubUserName: !Ref GithubUserName
+        GithubCommonRepoName: !Ref GithubCommonRepoName
+
+  CloudFormationSnsHook:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: lambda/CloudFormationSnsHook.yml
+      Parameters:
+        BasicLambdaRoleArn: !Ref BasicLambdaRoleArn
+
+Outputs:
+  GithubSnsHookLambdaArn:
+    Value: !GetAtt GithubSnsHook.Outputs.GithubSnsHookLambdaArn
+  CodeBuildStatusEventLambdaArn:
+    Value: !GetAtt CodeBuildStatusEvent.Outputs.CodeBuildStatusEventLambdaArn
+  CloudFormationSnsHookLambdaArn:
+    Value: !GetAtt CloudFormationSnsHook.Outputs.CloudFormationSnsHookLambdaArn

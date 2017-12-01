@@ -1,0 +1,31 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM User Stack
+
+Parameters:
+  CodeBuildStatusEventLambdaArn:
+    Type: String
+
+Resources:
+  # CloudWatch
+  ## CodeBuild status event
+  CodeBuildStatusCloudWatchEvent:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: CodeBuildStatusCloudWatchEvent
+      State: ENABLED
+      EventPattern:
+        source:
+          - aws.codebuild
+        detail-type:
+          - CodeBuild Build State Change
+        detail:
+          build-status:
+            - FAILED
+            - IN_PROGRESS
+            - STOPPED
+            - SUCCEEDED
+      Targets:
+        -
+          Id: CodeBuildStatusCloudWatchEvent
+          Arn: !Ref CodeBuildStatusEventLambdaArn
