@@ -1,0 +1,27 @@
+version: 0.1
+
+phases:
+  install:
+    commands:
+      - |
+        pip install -U pip
+        pip install awscli>=1.11.61
+  pre_build:
+    commands:
+      - |
+        [ -d .cfn ] || mkdir .cfn
+        aws configure set default.region $AWS_DEFAULT_REGION
+        for template in resources/* cfn.yml; do
+          echo "$template" | xargs -I% -t aws cloudformation validate-template --template-body file://%
+        done
+  build:
+    commands:
+      - |
+        aws cloudformation package \
+          --template-file cfn.yml \
+          --s3-bucket cloudformation-php-conf-ezaki \
+          --output-template-file package.yml
+artifacts:
+  files:
+    - ./package.yml
+  discard-paths: yes

@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create php DevOps env.
+Outputs:
+  GithubSnsKey:
+    Description: Aws key for Github SNS
+    Value:
+      Fn::GetAtt:
+      - IAMUser
+      - Outputs.GithubSnsKey
+  GithubSnsRegion:
+    Description: Sns region for Github SNS
+    Value:
+      Ref: AWS::Region
+  GithubSnsSecret:
+    Description: Aws secret for Github SNS
+    Value:
+      Fn::GetAtt:
+      - IAMUser
+      - Outputs.GithubSnsSecret
+  GithubSnsTopic:
+    Description: Sns topic for Github SNS
+    Value:
+      Fn::GetAtt:
+      - SNS
+      - Outputs.GithubToLambdaSnsTopicArn
+Parameters:
+  GithubAccessToken:
+    Default: github access token here
+    NoEcho: true
+    Type: String
+  GithubAccessUserName:
+    Default: github username here
+    Type: String
+  GithubCommonRepoName:
+    Default: php-a
+    Type: String
+  GithubMemberRepoName:
+    Default: php-b
+    Type: String
+  GithubUserName:
+    Default: opst-ezaki
+    Type: String
+  SettingsS3BucketName:
+    Default: opst-ezaki-cloudformation-php
+    Type: String
+Resources:
+  CloudWatch:
+    Properties:
+      Parameters:
+        CodeBuildStatusEventLambdaArn:
+          Fn::GetAtt:
+          - Lambda
+          - Outputs.CodeBuildStatusEventLambdaArn
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/cb6883eb1093dc9074987915b7f582af.template
+    Type: AWS::CloudFormation::Stack
+  CodeBuild:
+    Properties:
+      Parameters:
+        ArtifactBucketMemberName:
+          Fn::GetAtt:
+          - S3
+          - Outputs.ArtifactBucketMemberName
+        CodebuildRoleArn:
+          Fn::GetAtt:
+          - IAMRole
+          - Outputs.CodebuildRoleArn
+        EcrRepoCommonName:
+          Fn::GetAtt:
+          - ECR
+          - Outputs.EcrRepoCommonName
+        GithubCommonRepoName:
+          Ref: GithubCommonRepoName
+        GithubMemberRepoName:
+          Ref: GithubMemberRepoName
+        GithubUserName:
+          Ref: GithubUserName
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/af64d444d1893c1c8d1335e0b2a0b5b8.template
+    Type: AWS::CloudFormation::Stack
+  ECR:
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/d4369c35b675759c66ad250baf3a252c.template
+    Type: AWS::CloudFormation::Stack
+  IAMRole:
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/0e877100094c61e1b68ed94508200bb5.template
+    Type: AWS::CloudFormation::Stack
+  IAMUser:
+    Properties:
+      Parameters:
+        GithubToLambdaSnsTopicArn:
+          Fn::GetAtt:
+          - SNS
+          - Outputs.GithubToLambdaSnsTopicArn
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/f8e7e035b67501b6cebd8efb3c9ec436.template
+    Type: AWS::CloudFormation::Stack
+  InstanceProfile:
+    Properties:
+      Parameters:
+        EC2S3ReadRoleName:
+          Fn::GetAtt:
+          - IAMRole
+          - Outputs.EC2S3ReadRoleName
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/2fa288712b397e3e290a0f2bb462eba2.template
+    Type: AWS::CloudFormation::Stack
+  Lambda:
+    Properties:
+      Parameters:
+        ArtifactBucketMemberName:
+          Fn::GetAtt:
+          - S3
+          - Outputs.ArtifactBucketMemberName
+        BasicLambdaRoleArn:
+          Fn::GetAtt:
+          - IAMRole
+          - Outputs.BasicLambdaRoleArn
+        CloudFormationDeployLambdaRoleArn:
+          Fn::GetAtt:
+          - IAMRole
+          - Outputs.CloudFormationDeployLambdaRoleArn
+        CodeBuildLambdaRoleArn:
+          Fn::GetAtt:
+          - IAMRole
+          - Outputs.CodeBuildLambdaRoleArn
+        GithubAccessToken:
+          Ref: GithubAccessToken
+        GithubAccessUserName:
+          Ref: GithubAccessUserName
+        GithubCommonRepoName:
+          Ref: GithubCommonRepoName
+        GithubUserName:
+          Ref: GithubUserName
+        InvokeFunctionLambdaRoleArn:
+          Fn::GetAtt:
+          - IAMRole
+          - Outputs.InvokeFunctionLambdaRoleArn
+        SettingsS3BucketName:
+          Ref: SettingsS3BucketName
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/d8fc4411ad6437f7c3c566773c077fc7.template
+    Type: AWS::CloudFormation::Stack
+  S3:
+    Properties:
+      Parameters:
+        GithubMemberRepoName:
+          Ref: GithubMemberRepoName
+        GithubUserName:
+          Ref: GithubUserName
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/62df3dc627d36bfee3512f976d4a0078.template
+    Type: AWS::CloudFormation::Stack
+  SNS:
+    Properties:
+      Parameters:
+        CloudFormationSnsHookLambdaArn:
+          Fn::GetAtt:
+          - Lambda
+          - Outputs.CloudFormationSnsHookLambdaArn
+        GithubSnsHookLambdaArn:
+          Fn::GetAtt:
+          - Lambda
+          - Outputs.GithubSnsHookLambdaArn
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/7e972e072af9193b017685c5becd1877.template
+    Type: AWS::CloudFormation::Stack
+  SecurityGroup:
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cloudformation-php-conf-ezaki/c086a72183c5da1c8561d843ccb00a82.template
+    Type: AWS::CloudFormation::Stack
