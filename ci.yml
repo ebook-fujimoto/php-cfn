@@ -1,0 +1,200 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create php DevOps env pipeline.
+
+Parameters:
+  PipelineName:
+    Type: String
+  SettingsS3BucketName:
+    Type: String
+  GithubUserName:
+    Type: String
+  GithubCFnRepoName:
+    Type: String
+  GithubCommonRepoName:
+    Type: String
+  GithubMemberRepoName:
+    Type: String
+  GithubAccessUserName:
+    Type: String
+  GithubAccessToken:
+    Type: String
+
+Resources:
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: S3FullAccess
+                Effect: Allow
+                Action: s3:*
+                Resource:
+                  - !Sub arn:aws:s3:::${ArtifactStoreBucket}
+                  - !Sub arn:aws:s3:::${ArtifactStoreBucket}/*
+              - Sid: FullAccess
+                Effect: Allow
+                Action:
+                  - cloudformation:*
+                  - iam:PassRole
+                Resource: "*"
+              - Sid: CodeBuildAccess
+                Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource: !GetAtt CodeBuildProject.Arn
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: CloudWatchLogsAccess
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
+              - Sid: S3Access
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !Sub arn:aws:s3:::${ArtifactStoreBucket}
+                  - !Sub arn:aws:s3:::${ArtifactStoreBucket}/*
+                  - !Sub arn:aws:s3:::${SettingsS3BucketName}
+                  - !Sub arn:aws:s3:::${SettingsS3BucketName}/*
+              - Sid: CloudFormationAccess
+                Effect: Allow
+                Action: cloudformation:ValidateTemplate
+                Resource: "*"
+
+  CFnRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: cloudformation.amazonaws.com
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactStoreBucket
+      RoleArn: !GetAtt PipelineRole.Arn
+      Name: !Ref PipelineName
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: download-source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref GithubUserName
+                Repo: !Ref GithubCFnRepoName
+                Branch: master
+                OAuthToken: !Ref GithubAccessToken
+              OutputArtifacts:
+                - Name: SourceOutput
+        - Name: Build
+          Actions:
+            - InputArtifacts:
+              - Name: SourceOutput
+              Name: create-changeset
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+        - Name: Deploy
+          Actions:
+            - InputArtifacts:
+              - Name: BuildOutput
+              Name: exec-changeset
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Ref PipelineName
+                ChangeSetName: changeset
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !GetAtt CFnRole.Arn
+                TemplatePath: BuildOutput::package.yml
+                ParameterOverrides: !Sub |
+                  {
+                    "SettingsS3BucketName":"${SettingsS3BucketName}",
+                    "GithubAccessUserName":"${GithubAccessUserName}",
+                    "GithubAccessToken":"${GithubAccessToken}",
+                    "GithubUserName":"${GithubUserName}",
+                    "GithubCommonRepoName":"${GithubCommonRepoName}",
+                    "GithubMemberRepoName":"${GithubMemberRepoName}"
+                  }
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref PipelineName
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/nodejs:7.0.0
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: ap-northeast-1
+          - Name: S3_BUCKET
+            Value: !Ref ArtifactStoreBucket
+      Source:
+        Type: CODEPIPELINE
+
+  ArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${PipelineName}-artifact-store-bucket

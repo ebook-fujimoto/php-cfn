@@ -15,7 +15,7 @@ phases:
       - |
         aws cloudformation package \
           --template-file cfn.yml \
-          --s3-bucket cloudformation-php-conf-ezaki \
+          --s3-bucket $S3_BUCKET \
           --output-template-file package.yml
 artifacts:
   files:
