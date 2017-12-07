@@ -1,21 +1,37 @@
-GITHUB_ACCESS_USER_NAME = USER_NAME
+GITHUB_ACCESS_USER_NAME = opst-ezaki
 GITHUB_ACCESS_TOKEN = USER_TOKEN
-GITHUB_USER_NAME = USER_NAME
+GITHUB_USER_NAME = opst-ezaki
+GITHUB_CFN_REPO_NAME = php-cfn
 GITHUB_COMMON_REPO_NAME = php-a
 GITHUB_MEMBER_REPO_NAME = php-b
 
 S3_BUCKET = cloudformation-php-conf-bucket-name
 
-STACK_NAME = init
+INIT_STACK_NAME = init
 GENERATE_ROOT_TEMPLATE_FILE = package.yml
+
+TEST_STACK_NAME = test
 
 #---------------------------------------------#
 
-all: package deploy github_setting
+init:
+	@aws cloudformation deploy \
+				--template-file ci.yml \
+				--stack-name $(INIT_STACK_NAME) \
+				--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+				--parameter-overrides \
+				InitStackName=$(INIT_STACK_NAME) \
+				TestStackName=$(TEST_STACK_NAME) \
+				SettingsS3BucketName=$(S3_BUCKET) \
+				GithubUserName=$(GITHUB_USER_NAME) \
+				GithubCFnRepoName=$(GITHUB_CFN_REPO_NAME) \
+				GithubCommonRepoName=$(GITHUB_COMMON_REPO_NAME) \
+				GithubMemberRepoName=$(GITHUB_MEMBER_REPO_NAME) \
+				GithubAccessUserName=$(GITHUB_ACCESS_USER_NAME) \
+				GithubAccessToken=$(GITHUB_ACCESS_TOKEN)
+
 
 package:
-	@-aws s3 rb s3://$(S3_BUCKET) --force
-	@aws s3 mb s3://$(S3_BUCKET)
 	@aws cloudformation package \
 				--template-file cfn.yml \
 				--s3-bucket $(S3_BUCKET) \
@@ -24,7 +40,7 @@ package:
 deploy:
 	@aws cloudformation deploy \
 				--template-file $(GENERATE_ROOT_TEMPLATE_FILE) \
-				--stack-name $(STACK_NAME) \
+				--stack-name $(TEST_STACK_NAME) \
 				--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
 				--parameter-overrides \
 				SettingsS3BucketName=$(S3_BUCKET) \
@@ -36,7 +52,7 @@ deploy:
 	@aws s3 cp teststack.yml s3://$(S3_BUCKET)/
 
 github_setting:
-	@aws cloudformation describe-stacks --output json --stack-name $(STACK_NAME) > .tmp
+	@aws cloudformation describe-stacks --output json --stack-name $(TEST_STACK_NAME) > .tmp
 	@node ./init.js \
 		`cat .tmp | jq -r '.Stacks[].Outputs[]|select(.OutputKey=="GithubSnsKey").OutputValue'` \
 		`cat .tmp | jq -r '.Stacks[].Outputs[]|select(.OutputKey=="GithubSnsSecret").OutputValue'` \
@@ -45,8 +61,4 @@ github_setting:
 		$(GITHUB_USER_NAME) $(GITHUB_ACCESS_TOKEN) $(GITHUB_COMMON_REPO_NAME) $(GITHUB_MEMBER_REPO_NAME)
 	@rm .tmp
 
-delete:
-	@aws cloudformation delete-stack \
-				--stack-name $(STACK_NAME)
-
-.PHONY: package deploy github_setting delete all
+.PHONY: init package deploy github_setting

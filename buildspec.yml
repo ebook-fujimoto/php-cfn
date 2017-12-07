@@ -8,15 +8,17 @@ phases:
         pip install awscli==1.11.177
   pre_build:
     commands:
-      - |
-        aws configure set default.region $AWS_DEFAULT_REGION
   build:
     commands:
       - |
         aws cloudformation package \
-          --template-file cfn.yml \
-          --s3-bucket $S3_BUCKET \
-          --output-template-file package.yml
+            --template-file cfn.yml \
+            --s3-bucket ${S3_BUCKET} \
+            --output-template-file package.yml
+  post_build:
+    commands:
+      - aws s3 cp teststack.yml s3://${S3_BUCKET}/
+
 artifacts:
   files:
     - ./package.yml

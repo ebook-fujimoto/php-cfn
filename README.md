@@ -9,12 +9,13 @@
   [http://docs.aws.amazon.com/ja_jp/cli/latest/userguide/cli-chap-getting-started.html](http://docs.aws.amazon.com/ja_jp/cli/latest/userguide/cli-chap-getting-started.html) に従って認証情報を登録してください
 1. [Github Personal access tokens](https://github.com/settings/tokens) ページにて、`Generate new token` を選択し、
   - Token description: AWS_commit_status
-  - Select scopes: repo:status, admin:repo_hook
+  - Select scopes: repo, admin:repo_hook
   の内容で token を生成、 token を控えておいてください
 
 1. Makefile をテキストエディタで開き、以下の値を適切に書き換えます
   - GITHUB_ACCESS_TOKEN: 最初に生成し、控えた token
   - GITHUB_ACCESS_USER_NAME: token を生成したユーザー名
+  - GITHUB_CFN_REPO_NAME: cfn 構成ファイルのレポジトリの名前
   - GITHUB_COMMON_REPO_NAME: common 側のレポジトリの名前
   - GITHUB_MEMBER_REPO_NAME: member 側のレポジトリの名前
   - GITHUB_USER_NAME: レポジトリを所有しているユーザーの名前
@@ -25,3 +26,6 @@
   > make
   ```
   を実行してください
+
+1. `make` により、全ての CFn の作成が完了した後、 `make github_setting` を実行します
+  (make が作成した codepipeline が自動的にもう一つの CFn を起動しますので、この処理が完了するのを待って実行してください)
