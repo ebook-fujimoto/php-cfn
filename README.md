@@ -29,3 +29,9 @@
 
 1. `make` により、全ての CFn の作成が完了した後、 `make github_setting` を実行します
   (make が作成した codepipeline が自動的にもう一つの CFn を起動しますので、この処理が完了するのを待って実行してください)
+
+## 構成
+
+現在の構成
+
+![image](https://user-images.githubusercontent.com/26862113/33827474-d70f2ad0-deab-11e7-97a2-df707e623957.png)
