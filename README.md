@@ -34,4 +34,4 @@
 
 現在の構成
 
-![image](https://user-images.githubusercontent.com/26862113/33827474-d70f2ad0-deab-11e7-97a2-df707e623957.png)
+![diagram](https://user-images.githubusercontent.com/26862113/34028934-2cf12836-e1a9-11e7-88a9-ad7237d53d46.png)
