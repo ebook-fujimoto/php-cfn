@@ -7,6 +7,8 @@ GITHUB_MEMBER_REPO_NAME = php-b
 
 S3_BUCKET = cloudformation-php-conf-bucket-name
 
+EXEC_UNIQUE_ID=`date +%s`
+
 INIT_STACK_NAME = init
 GENERATE_ROOT_TEMPLATE_FILE = package.yml
 
@@ -28,7 +30,8 @@ init:
 				GithubCommonRepoName=$(GITHUB_COMMON_REPO_NAME) \
 				GithubMemberRepoName=$(GITHUB_MEMBER_REPO_NAME) \
 				GithubAccessUserName=$(GITHUB_ACCESS_USER_NAME) \
-				GithubAccessToken=$(GITHUB_ACCESS_TOKEN)
+				GithubAccessToken=$(GITHUB_ACCESS_TOKEN) \
+				ExecUniqueID=$(EXEC_UNIQUE_ID)
 
 
 package:
@@ -48,7 +51,8 @@ deploy:
 				GithubAccessToken=$(GITHUB_ACCESS_TOKEN) \
 				GithubUserName=$(GITHUB_USER_NAME) \
 				GithubCommonRepoName=$(GITHUB_COMMON_REPO_NAME) \
-				GithubMemberRepoName=$(GITHUB_MEMBER_REPO_NAME)
+				GithubMemberRepoName=$(GITHUB_MEMBER_REPO_NAME) \
+				ExecUniqueID=$(EXEC_UNIQUE_ID)
 	@aws s3 cp teststack.yml s3://$(S3_BUCKET)/
 
 github_setting:

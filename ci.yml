@@ -21,6 +21,8 @@ Parameters:
     Type: String
   GithubAccessToken:
     Type: String
+  ExecUniqueID:
+    Type: String
 
 Resources:
   PipelineRole:
@@ -199,9 +201,9 @@ Resources:
   ArtifactStoreBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub ${InitStackName}-artifact-store-bucket
+      BucketName: !Sub ${InitStackName}-artifact-store-bucket-${ExecUniqueID}
 
   SettingStoreBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref SettingsS3BucketName
+      BucketName: !Sub ${SettingsS3BucketName}-${ExecUniqueID}
